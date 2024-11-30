@@ -1,4 +1,3 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -14,4 +13,6 @@ class MYSHOOTTHEMUP_API AMyShootThemUpGameModeBase : public AGameModeBase
 {
 	GENERATED_BODY()
 	
+public:
+	AMyShootThemUpGameModeBase();
 };

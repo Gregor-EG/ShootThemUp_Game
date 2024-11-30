@@ -6,24 +6,59 @@
 #include "GameFramework/Character.h"
 #include "STUBaseCharacter.generated.h"
 
+class UCameraComponent;
+class USpringArmComponent;
+
 UCLASS()
 class MYSHOOTTHEMUP_API ASTUBaseCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this character's properties
-	ASTUBaseCharacter();
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	USkeletalMeshComponent* SkeletalMeshComponent;
 
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	UCharacterMovementComponent* CharacterMovementComponent;
 
-public:	
-	// Called every frame
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	USpringArmComponent* SpringArmComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	UCameraComponent* CameraComponent;
+
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	float GetMovementDirection() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	float GetSpeed() const;
+
+	UFUNCTION(BlueprintCallable)
+	bool isRunning() const;
+
+	ASTUBaseCharacter(const FObjectInitializer& ObjInit);
+
 	virtual void Tick(float DeltaTime) override;
-
-	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+
+protected:
+	virtual void BeginPlay() override;
+
+private:
+	UAnimInstance* AnimInstance;
+
+	bool MovingForward = false;
+	bool WantsToRun = false;
+
+	float TargetSpeed{};
+	float InterpolationTime{};
+
+	void MoveForward(float Amount);
+	void MoveRight(float Amount);
+
+	void StartRunning();
+	void StopRunning();
+
+	void UpdateMaxSpeed(float DeltaTime);
 };
