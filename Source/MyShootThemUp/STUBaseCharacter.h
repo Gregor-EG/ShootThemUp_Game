@@ -6,8 +6,11 @@
 #include "GameFramework/Character.h"
 #include "STUBaseCharacter.generated.h"
 
+class USTUHealthComponent;
+class UTextRenderComponent;
 class UCameraComponent;
 class USpringArmComponent;
+class UAnimInstance;
 
 UCLASS()
 class MYSHOOTTHEMUP_API ASTUBaseCharacter : public ACharacter
@@ -16,16 +19,25 @@ class MYSHOOTTHEMUP_API ASTUBaseCharacter : public ACharacter
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
-	USkeletalMeshComponent* SkeletalMeshComponent;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
-	UCharacterMovementComponent* CharacterMovementComponent;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
 	USpringArmComponent* SpringArmComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
 	UCameraComponent* CameraComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	USTUHealthComponent* HealthComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+	UTextRenderComponent* HealthTextComponent;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Amination")
+	UAnimMontage* DeathAnimMontage;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	FVector2D LandedDamageVelocity{900.f, 1200.f};
+
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	FVector2D LandedDamage{ 10.f, 100.f };
 
 	UFUNCTION(BlueprintCallable, Category = "Movement")
 	float GetMovementDirection() const;
@@ -60,5 +72,9 @@ private:
 	void StartRunning();
 	void StopRunning();
 
-	void UpdateMaxSpeed(float DeltaTime);
+	void OnDeath();
+	void OnHealthChanged(float Health);
+
+	UFUNCTION()
+	void OnGroundLanded(const FHitResult& Hit);
 };

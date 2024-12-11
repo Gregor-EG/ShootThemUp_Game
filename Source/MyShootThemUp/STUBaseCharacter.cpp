@@ -6,12 +6,13 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Animation/AnimInstance.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "MyShootThemUp/Public/Components/STUCharacterMovementComponent.h"
+#include "MyShootThemUp/Public/Components/STUHealthComponent.h"
+#include "Components/TextRenderComponent.h"
+#include "GameFramework/Controller.h"
 
-const float RunningSpeed = 600.f;
-const float WalkingSpeed = 450.f;
-const float IdlingSpeed = 0.f;
-
+DEFINE_LOG_CATEGORY_STATIC(BaseCharacterLog, All, All)
 
 float ASTUBaseCharacter::GetMovementDirection() const
 {
@@ -36,6 +37,8 @@ ASTUBaseCharacter::ASTUBaseCharacter(const FObjectInitializer& ObjInit) :
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+
+
 	SpringArmComponent = CreateDefaultSubobject<USpringArmComponent>("SpringArmComponent");
 	SpringArmComponent->SetupAttachment(GetRootComponent());
 	SpringArmComponent->bUsePawnControlRotation = true;
@@ -43,68 +46,51 @@ ASTUBaseCharacter::ASTUBaseCharacter(const FObjectInitializer& ObjInit) :
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>("CameraComponent");
 	CameraComponent->SetupAttachment(SpringArmComponent);
 
+	HealthComponent = CreateDefaultSubobject<USTUHealthComponent>("HealthComponent");
 
+	HealthTextComponent = CreateDefaultSubobject<UTextRenderComponent>("HealthTextComponent");
+	HealthTextComponent->SetupAttachment(GetRootComponent());
 }
 
 void ASTUBaseCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	
-}
 
+	HealthComponent->OnDeath.AddUObject(this, &ASTUBaseCharacter::OnDeath);
+	LandedDelegate.AddDynamic(this, &ASTUBaseCharacter::OnGroundLanded);
 
-void ASTUBaseCharacter::MoveForward(float Amount)
-{
-	if (CharacterMovementComponent->IsFalling()) return;
-	if (AnimInstance->GetCurrentStateName(0) == "EndJump") return;
+	OnHealthChanged(HealthComponent->GetHealth());
+	HealthComponent->OnHealthChanged.AddUObject(this, &ASTUBaseCharacter::OnHealthChanged);
 
-
-	MovingForward = Amount > 0.f;
-
-
-	AddMovementInput(GetActorForwardVector(), Amount);
-}
-
-void ASTUBaseCharacter::MoveRight(float Amount)
-{
-	if (CharacterMovementComponent->IsFalling()) return;
-	if (AnimInstance->GetCurrentStateName(0) == "EndJump") return;
-
-	AddMovementInput(GetActorRightVector(), Amount);
-}
-
-void ASTUBaseCharacter::StartRunning()
-{
-	WantsToRun = true;
-}
-
-void ASTUBaseCharacter::StopRunning()
-{
-	WantsToRun = false;
-}
-
-void ASTUBaseCharacter::UpdateMaxSpeed(float DeltaTime)
-{
-	float CurrentMaxSpeed = CharacterMovementComponent->MaxWalkSpeed;
-	if (TargetSpeed == CurrentMaxSpeed) return;
-
-	float InterpolatedSpeed = FMath::FInterpTo(CurrentMaxSpeed, TargetSpeed, DeltaTime, 10.f);
-	CharacterMovementComponent->MaxWalkSpeed = InterpolatedSpeed;
+	AnimInstance = GetMesh()->GetAnimInstance();
 }
 
 void ASTUBaseCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	//UpdateMaxSpeed(DeltaTime);
+}
+
+void ASTUBaseCharacter::MoveForward(float Amount)
+{
+	if (GetCharacterMovement()->IsFalling()) return;
+	if (AnimInstance->GetCurrentStateName(1) == "EndJump") return;
+
+	MovingForward = Amount > 0.f;
+	AddMovementInput(GetActorForwardVector(), Amount);
+}
+
+void ASTUBaseCharacter::MoveRight(float Amount)
+{
+	if (GetCharacterMovement()->IsFalling()) return;
+	if (AnimInstance->GetCurrentStateName(1) == "EndJump") return;
+
+	AddMovementInput(GetActorRightVector(), Amount);
 }
 
 void ASTUBaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	CharacterMovementComponent = GetCharacterMovement();
-	SkeletalMeshComponent = GetMesh();
-	AnimInstance = SkeletalMeshComponent->GetAnimInstance();
+	
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &ASTUBaseCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &ASTUBaseCharacter::MoveRight);
@@ -117,4 +103,44 @@ void ASTUBaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction("Run", IE_Pressed, this, &ASTUBaseCharacter::StartRunning);
 	PlayerInputComponent->BindAction("Run", IE_Released, this, &ASTUBaseCharacter::StopRunning);
 }
+
+
+void ASTUBaseCharacter::StartRunning()
+{
+	WantsToRun = true;
+}
+
+void ASTUBaseCharacter::StopRunning()
+{
+	WantsToRun = false;
+}
+
+void ASTUBaseCharacter::OnDeath()
+{
+	PlayAnimMontage(DeathAnimMontage);
+
+	GetCharacterMovement()->DisableMovement();
+	SetLifeSpan(5.f);
+	if (Controller)
+	{
+		Controller->ChangeState(NAME_Spectating);
+	}
+}
+
+void ASTUBaseCharacter::OnHealthChanged(float Health)
+{
+	HealthTextComponent->SetText(FText::FromString(FString::Printf(TEXT("%.0f"), Health)));
+}
+
+void ASTUBaseCharacter::OnGroundLanded(const FHitResult& Hit)
+{
+	const auto FallVelocity = -GetCharacterMovement()->Velocity.Z;
+	if (FallVelocity < LandedDamageVelocity.X) return;
+
+	const auto FinalDamage = FMath::GetMappedRangeValueClamped(LandedDamageVelocity, LandedDamage, FallVelocity);
+	TakeDamage(FinalDamage, FDamageEvent{}, nullptr, nullptr);
+}
+
+
+
 
